@@ -1,32 +1,32 @@
-; ============================================================
+; ===================================================================
 ; PROGRAM: Graph Connectivity Checker using DFS
-; ============================================================
-
-global main
-extern printf
-extern scanf
-extern exit
+; QUESTION: Set B - Question 1
+; ===================================================================
 
 section .data
-    prompt_n    db "Enter number of vertices: ", 0
-    prompt_m    db "Enter adjacency matrix:", 10, 0
+    prompt_n    db "Enter number of vertices: "
+    prompt_n_l  equ $ - prompt_n
 
-    scan_int    db "%d", 0
+    prompt_m    db "Enter adjacency matrix:", 10
+    prompt_m_l  equ $ - prompt_m
 
-    msg_conn    db "Graph is CONNECTED", 10, 0
-    msg_not     db "Graph is NOT CONNECTED", 10, 0
+    msg_conn    db "Graph is CONNECTED", 10
+    msg_conn_l  equ $ - msg_conn
+
+    msg_not     db "Graph is NOT CONNECTED", 10
+    msg_not_l   equ $ - msg_not
 
 section .bss
     n           resd 1
-    adj         resd 100        ; max 10x10
+    adj         resd 100
     visited     resb 10
+    buf         resb 4
 
 section .text
+    global main
 
-; ------------------------------------------------------------
-; dfs(int vertex)
-; eax = vertex
-; ------------------------------------------------------------
+; Recursive DFS function to traverse graph
+; Parameters: eax = current vertex
 dfs:
     push ebp
     mov ebp, esp
@@ -38,19 +38,20 @@ dfs:
     mov esi, eax
     mov byte [visited + esi], 1
 
-    xor ecx, ecx               ; for each vertex
+    xor ecx, ecx
 
 .loop:
     mov edx, [n]
     cmp ecx, edx
     jge .done
 
-    ; adj[esi][ecx]
+    ; Calculate adjacency matrix index
     mov eax, esi
     imul eax, [n]
     add eax, ecx
     mov ebx, [adj + eax*4]
 
+    ; Check if edge exists and vertex not visited
     cmp ebx, 1
     jne .next
 
@@ -74,57 +75,79 @@ dfs:
     pop ebp
     ret
 
-; ------------------------------------------------------------
-; main()
-; ------------------------------------------------------------
 main:
-    ; printf("Enter number of vertices: ");
-    push prompt_n
-    call printf
-    add esp, 4
+    ; Read number of vertices from user
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, prompt_n
+    mov edx, prompt_n_l
+    int 0x80
 
-    ; scanf("%d", &n);
-    push n
-    push scan_int
-    call scanf
-    add esp, 8
+    ; Get vertex count input
+    mov eax, 3
+    mov ebx, 0
+    mov ecx, buf
+    mov edx, 4
+    int 0x80
 
-    ; printf("Enter adjacency matrix:\n");
-    push prompt_m
-    call printf
-    add esp, 4
+    ; Convert ASCII digit to integer
+    movzx eax, byte [buf]
+    sub eax, '0'
+    mov [n], eax
 
-    ; Read adjacency matrix
-    xor ecx, ecx                ; index
+    ; Prompt for adjacency matrix input
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, prompt_m
+    mov edx, prompt_m_l
+    int 0x80
+
+    ; Read adjacency matrix elements
+    xor edi, edi
 
 .read_matrix:
-    mov eax, [n]
-    imul eax, eax               ; n*n
-    cmp ecx, eax
-    jge .matrix_done
+    mov eax, 3
+    mov ebx, 0
+    mov ecx, buf
+    mov edx, 1
+    int 0x80
 
-    push adj
-    lea eax, [adj + ecx*4]
-    push eax
-    push scan_int
-    call scanf
-    add esp, 8
+    test eax, eax
+    jz .matrix_done
 
-    inc ecx
-    jmp .read_matrix
+    movzx eax, byte [buf]
+
+    ; Skip whitespace
+    cmp al, ' '
+    je .read_matrix
+    cmp al, 10
+    je .read_matrix
+    cmp al, 13
+    je .read_matrix
+
+    ; Store matrix element
+    sub eax, '0'
+    mov [adj + edi*4], eax
+    inc edi
+
+    ; Check if matrix is complete
+    mov ecx, [n]
+    imul ecx, ecx
+    cmp edi, ecx
+    jl .read_matrix
 
 .matrix_done:
     ; Clear visited array
-    xor eax, eax
     mov ecx, 10
     mov edi, visited
+    xor eax, eax
     rep stosb
 
-    ; DFS from vertex 0
+    ; Start DFS from vertex 0
     xor eax, eax
     call dfs
 
-    ; Check if all visited
+    ; Verify all vertices were visited
     xor ecx, ecx
 
 .check_loop:
@@ -139,16 +162,24 @@ main:
     jmp .check_loop
 
 .connected:
-    push msg_conn
-    call printf
-    add esp, 4
+    ; Print connected message
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, msg_conn
+    mov edx, msg_conn_l
+    int 0x80
     jmp .exit
 
 .not_connected:
-    push msg_not
-    call printf
-    add esp, 4
+    ; Print not connected message
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, msg_not
+    mov edx, msg_not_l
+    int 0x80
 
 .exit:
-    push 0
-    call exit
+    ; Terminate program
+    mov eax, 1
+    xor ebx, ebx
+    int 0x80
